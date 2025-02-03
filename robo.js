@@ -2,8 +2,7 @@ const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
 const client = new Client({
     puppeteer: {
-        executablePath: '/usr/bin/chromium-browser',  // Caminho correto para Ubuntu
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        executablePath: '/usr/bin/google-chrome',
     }
 });
 // Map para armazenar o estado da conversa de cada usuário
