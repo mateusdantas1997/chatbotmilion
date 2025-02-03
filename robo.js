@@ -146,7 +146,7 @@ async function processNextStage(userId, msg, currentStage) {
             await delay(10000);
             await chat.sendStateTyping();
             await delay(3000);
-            await client.sendMessage(msg.from, 'Por hoje vou deixar por menos de 10 reais só para você meu bb, aproveite rsrs');
+            await client.sendMessage(msg.from, 'Por hoje vou deixar por menos de 15 reais só para você meu bb, aproveite rsrs');
             
             await delay(10000);
             await chat.sendStateRecording();
