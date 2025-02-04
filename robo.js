@@ -130,6 +130,7 @@ async function processNextStage(userId, msg, currentStage) {
 
                 const videos = [
                     './video1.mp4',
+                    './video1.mp4',
                     './video3.mp4'
                 ];
                 await sendMultipleVideos(msg, videos);
