@@ -1,8 +1,20 @@
 const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
+
+// Caminho para o Chromium ou Google Chrome, dependendo de sua instalação
+const chromePath = '/usr/bin/google-chrome'; // Ajuste o caminho se necessário
+
 const client = new Client({
     puppeteer: {
-        executablePath: '/usr/bin/google-chrome',
+        executablePath: chromePath,
+        headless: true, // Para rodar sem uma interface gráfica
+        args: [
+            '--no-sandbox',  // Necessário em algumas distribuições Linux (como o Ubuntu)
+            '--disable-setuid-sandbox', // Necessário em algumas distribuições Linux
+            '--disable-dev-shm-usage',  // Melhorar o desempenho no Linux
+            '--disable-gpu',  // Desabilita o uso da GPU, se houver problemas com isso
+            '--remote-debugging-port=9222', // Caso precise debugar
+        ],
     },
     webVersionCache: {
         type: 'none', // Desativa o cache local para evitar problemas
