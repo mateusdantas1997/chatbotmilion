@@ -158,7 +158,7 @@ async function processNextStage(userId, msg, currentStage) {
                 await delay(5000);
                 await chat.sendStateTyping();
                 await delay(5000);
-                await client.sendMessage(msg.from, 'Você está perdendo tempo de me ver de quatro brincando com minha pepequinha amor');
+                await client.sendMessage(msg.from, 'Amor você está perdendo tempo de me ver de quatro brincando com minha pepequinha');
 
                 await delay(10000);
                 await chat.sendStateTyping();
