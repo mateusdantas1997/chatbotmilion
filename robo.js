@@ -1,51 +1,44 @@
 const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
+const fs = require('fs');
+const path = require('path');
 
-// Caminho para o Chromium ou Google Chrome, dependendo de sua instalação
-const chromePath = '/usr/bin/google-chrome'; // Ajuste o caminho se necessário
+// Caminho para o Chromium ou Google Chrome
+const chromePath = '/usr/bin/google-chrome';
 
 const client = new Client({
     puppeteer: {
         executablePath: chromePath,
-        headless: true, // Para rodar sem uma interface gráfica
+        headless: true,
         args: [
-            '--no-sandbox',  // Necessário em algumas distribuições Linux (como o Ubuntu)
-            '--disable-setuid-sandbox', // Necessário em algumas distribuições Linux
-            '--disable-dev-shm-usage',  // Melhorar o desempenho no Linux
-            '--disable-gpu',  // Desabilita o uso da GPU, se houver problemas com isso
-            '--remote-debugging-port=9222', // Caso precise debugar
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--remote-debugging-port=9222',
         ],
     },
     webVersionCache: {
-        type: 'none', // Desativa o cache local para evitar problemas
+        type: 'none',
     },
 });
 
-// Map para armazenar o estado da conversa de cada usuário
 const userStates = new Map();
-
-// Map para controlar mensagens já enviadas
 const messagesSent = new Map();
-
-// Set para rastrear conversas finalizadas
 const finishedConversations = new Set();
 
-// Função de delay
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Função para verificar se a mensagem já foi enviada
 function checkMessageSent(userId, stage) {
     return messagesSent.get(`${userId}-${stage}`);
 }
 
-// Função para marcar mensagem como enviada
 function markMessageAsSent(userId, stage) {
     messagesSent.set(`${userId}-${stage}`, true);
 }
 
-// Função para enviar múltiplos vídeos
 async function sendMultipleVideos(msg, videoPaths) {
     try {
         if (!videoPaths || !Array.isArray(videoPaths)) {
@@ -53,20 +46,49 @@ async function sendMultipleVideos(msg, videoPaths) {
         }
 
         for (let i = 0; i < videoPaths.length; i++) {
-            if (!videoPaths[i]) {
-                console.error('Caminho do vídeo inválido:', videoPaths[i]);
-                continue;
-            }
+            try {
+                if (!videoPaths[i]) {
+                    console.error('Caminho do vídeo inválido:', videoPaths[i]);
+                    continue;
+                }
 
-            const video = MessageMedia.fromFilePath(videoPaths[i]);
-            if (!video) {
-                console.error('Erro ao carregar o vídeo:', videoPaths[i]);
-                continue;
-            }
+                // Verificar se o arquivo existe
+                const absolutePath = path.resolve(__dirname, videoPaths[i]);
+                if (!fs.existsSync(absolutePath)) {
+                    console.error(`Arquivo não encontrado: ${absolutePath}`);
+                    continue;
+                }
 
-            await client.sendMessage(msg.from, video);
-            if (i < videoPaths.length - 1) {
-                await delay(6000); // Delay entre vídeos
+                const video = MessageMedia.fromFilePath(absolutePath);
+                if (!video) {
+                    console.error('Erro ao carregar o vídeo:', absolutePath);
+                    continue;
+                }
+
+                let attempts = 0;
+                const maxAttempts = 3;
+                
+                while (attempts < maxAttempts) {
+                    try {
+                        await client.sendMessage(msg.from, video);
+                        console.log(`Vídeo enviado com sucesso: ${absolutePath}`);
+                        break;
+                    } catch (sendError) {
+                        attempts++;
+                        console.error(`Tentativa ${attempts} falhou ao enviar vídeo:`, sendError);
+                        if (attempts === maxAttempts) {
+                            throw sendError;
+                        }
+                        await delay(2000 * attempts);
+                    }
+                }
+
+                if (i < videoPaths.length - 1) {
+                    await delay(6000);
+                }
+            } catch (videoError) {
+                console.error(`Erro ao processar vídeo ${videoPaths[i]}:`, videoError);
+                continue;
             }
         }
     } catch (error) {
@@ -74,10 +96,8 @@ async function sendMultipleVideos(msg, videoPaths) {
     }
 }
 
-// Função para processar o próximo estágio da conversa
 async function processNextStage(userId, msg, currentStage) {
     try {
-        // Verifica se a conversa já foi finalizada
         if (finishedConversations.has(userId)) {
             console.log('Conversa já finalizada para o usuário:', userId);
             return;
@@ -85,7 +105,6 @@ async function processNextStage(userId, msg, currentStage) {
 
         const chat = await msg.getChat();
 
-        // Verifica se já enviou as mensagens deste estágio
         if (checkMessageSent(userId, currentStage)) {
             console.log(`Mensagem já enviada para o estágio: ${currentStage}`);
             return;
@@ -108,10 +127,11 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateRecording();
                 await delay(10000);
 
-                const audio1 = MessageMedia.fromFilePath('./audio1.ogg');
-                if (!audio1) {
-                    throw new Error('Erro ao carregar o áudio 1.');
+                const audio1Path = path.resolve(__dirname, './audio1.ogg');
+                if (!fs.existsSync(audio1Path)) {
+                    throw new Error(`Áudio não encontrado: ${audio1Path}`);
                 }
+                const audio1 = MessageMedia.fromFilePath(audio1Path);
                 await client.sendMessage(msg.from, audio1, { sendAudioAsVoice: true });
 
                 await delay(5000);
@@ -138,10 +158,11 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateRecording();
                 await delay(10000);
 
-                const audio2 = MessageMedia.fromFilePath('./audio2.ogg');
-                if (!audio2) {
-                    throw new Error('Erro ao carregar o áudio 2.');
+                const audio2Path = path.resolve(__dirname, './audio2.ogg');
+                if (!fs.existsSync(audio2Path)) {
+                    throw new Error(`Áudio não encontrado: ${audio2Path}`);
                 }
+                const audio2 = MessageMedia.fromFilePath(audio2Path);
                 await client.sendMessage(msg.from, audio2, { sendAudioAsVoice: true });
 
                 await delay(3000);
@@ -178,10 +199,11 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateRecording();
                 await delay(10000);
 
-                const audio3 = MessageMedia.fromFilePath('./audio3.ogg');
-                if (!audio3) {
-                    throw new Error('Erro ao carregar o áudio 3.');
+                const audio3Path = path.resolve(__dirname, './audio3.ogg');
+                if (!fs.existsSync(audio3Path)) {
+                    throw new Error(`Áudio não encontrado: ${audio3Path}`);
                 }
+                const audio3 = MessageMedia.fromFilePath(audio3Path);
                 await client.sendMessage(msg.from, audio3, { sendAudioAsVoice: true });
 
                 await delay(10000);
@@ -193,10 +215,11 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateRecording();
                 await delay(10000);
 
-                const audio5 = MessageMedia.fromFilePath('./audio5.ogg');
-                if (!audio5) {
-                    throw new Error('Erro ao carregar o áudio 5.');
+                const audio5Path = path.resolve(__dirname, './audio5.ogg');
+                if (!fs.existsSync(audio5Path)) {
+                    throw new Error(`Áudio não encontrado: ${audio5Path}`);
                 }
+                const audio5 = MessageMedia.fromFilePath(audio5Path);
                 await client.sendMessage(msg.from, audio5, { sendAudioAsVoice: true });
 
                 await delay(5000);
@@ -208,16 +231,12 @@ async function processNextStage(userId, msg, currentStage) {
                 await delay(3000);
                 await client.sendMessage(msg.from, 'Não me fale que você não vai ter menos que 15 reais bb?');
 
-                // Aqui apenas mudamos o estado e esperamos a próxima mensagem do cliente
                 userStates.set(userId, 'waiting_for_price_response');
                 break;
 
-            // Novo case para esperar a resposta do cliente
             case 'waiting_for_price_response':
                 markMessageAsSent(userId, currentStage);
-                // Aqui processamos a resposta do cliente e mudamos para o próximo estado
                 userStates.set(userId, 'waiting_final_promise');
-                // Agora sim processamos o próximo estágio
                 await processNextStage(userId, msg, 'waiting_final_promise');
                 break;
 
@@ -274,10 +293,12 @@ async function processNextStage(userId, msg, currentStage) {
                 await delay(10000);
                 await chat.sendStateRecording();
                 await delay(10000);
-                const audio6 = MessageMedia.fromFilePath('./audio6.ogg');
-                if (!audio6) {
-                    throw new Error('Erro ao carregar o áudio 6.');
+
+                const audio6Path = path.resolve(__dirname, './audio6.ogg');
+                if (!fs.existsSync(audio6Path)) {
+                    throw new Error(`Áudio não encontrado: ${audio6Path}`);
                 }
+                const audio6 = MessageMedia.fromFilePath(audio6Path);
                 await client.sendMessage(msg.from, audio6, { sendAudioAsVoice: true });
 
                 userStates.set(userId, 'waiting_after_audio6');
@@ -305,7 +326,6 @@ async function processNextStage(userId, msg, currentStage) {
                 await delay(8000);
                 await client.sendMessage(msg.from, 'Compre vai meu bb, deixa eu te fazer gozar mostrando minha bucetinha toda molhada🤤😈');
 
-                // Marca a conversa como finalizada e limpa os estados
                 finishedConversations.add(userId);
                 userStates.delete(userId);
                 break;
@@ -315,7 +335,6 @@ async function processNextStage(userId, msg, currentStage) {
     }
 }
 
-// Inicialização do cliente
 client.on('qr', qr => {
     qrcode.generate(qr, { small: true });
 });
@@ -334,29 +353,24 @@ client.on('disconnected', (reason) => {
 
 client.initialize();
 
-// Manipulador de mensagens
 client.on('message', async (msg) => {
     try {
         const userId = msg.from;
 
-        // Verificar se a mensagem não é de um grupo
         if (!msg.from.endsWith('@c.us')) {
             return;
         }
 
-        // Se a conversa já foi finalizada, simplesmente ignora
         if (finishedConversations.has(userId)) {
             return;
         }
 
-        // Se é uma nova conversa
         if (!userStates.has(userId)) {
             userStates.set(userId, 'initial');
             await processNextStage(userId, msg, 'initial');
             return;
         }
 
-        // Processar próximo estágio baseado no estado atual
         const currentState = userStates.get(userId);
         await processNextStage(userId, msg, currentState);
 
