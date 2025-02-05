@@ -207,7 +207,18 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateTyping();
                 await delay(3000);
                 await client.sendMessage(msg.from, 'Não me fale que você não vai ter menos que 15 reais bb?');
+
+                // Aqui apenas mudamos o estado e esperamos a próxima mensagem do cliente
+                userStates.set(userId, 'waiting_for_price_response');
+                break;
+
+            // Novo case para esperar a resposta do cliente
+            case 'waiting_for_price_response':
+                markMessageAsSent(userId, currentStage);
+                // Aqui processamos a resposta do cliente e mudamos para o próximo estado
                 userStates.set(userId, 'waiting_final_promise');
+                // Agora sim processamos o próximo estágio
+                await processNextStage(userId, msg, 'waiting_final_promise');
                 break;
 
             case 'waiting_final_promise':
@@ -255,7 +266,6 @@ async function processNextStage(userId, msg, currentStage) {
                 await delay(5000);
                 await client.sendMessage(msg.from, 'Te espero lá bb😈🔥');
 
-                // Move to waiting for response before audio6
                 userStates.set(userId, 'waiting_before_audio6');
                 break;
 
@@ -270,7 +280,6 @@ async function processNextStage(userId, msg, currentStage) {
                 }
                 await client.sendMessage(msg.from, audio6, { sendAudioAsVoice: true });
 
-                // Move to waiting for response after audio6
                 userStates.set(userId, 'waiting_after_audio6');
                 break;
 
