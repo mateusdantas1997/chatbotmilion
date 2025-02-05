@@ -387,3 +387,16 @@ client.on('message', async (msg) => {
         if (!userStates.has(userId)) {
             userStates.set(userId, 'initial');
             await processNextStage(userId, msg, 'initial');
+        } else {
+            const currentState = userStates.get(userId);
+            await processNextStage(userId, msg, currentState);
+        }
+    } catch (error) {
+        log.error('Erro no processamento de mensagem:', error);
+    }
+});
+
+// Inicialização do cliente
+client.initialize().catch(error => {
+    log.error('Erro ao inicializar o cliente:', error);
+});
