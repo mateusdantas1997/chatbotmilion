@@ -204,6 +204,10 @@ async function processNextStage(userId, msg, currentStage) {
                 await chat.sendStateTyping();
                 await delay(5000);
                 await client.sendMessage(msg.from, 'Mas me diz amor, que você vai assinar mesmo meu conteúdo e não vai perder essa chance de me ver peladinha?😈');
+                await delay(10000);
+                await chat.sendStateTyping();
+                await delay(3000);
+                await client.sendMessage(msg.from, 'Não me fale que você não vai ter menos que 15 reais bb?');
                 userStates.set(userId, 'waiting_final_promise');
                 break;
 
