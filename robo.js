@@ -2,8 +2,6 @@ const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const puppeteer = require('puppeteer');
 
 // Sistema de logs melhorado
 const log = {
@@ -19,27 +17,18 @@ const log = {
     }
 };
 
-// Caminho do Chrome (detectado automaticamente)
-const chromePath = puppeteer.executablePath();
-
 // Configuração do cliente com sistema de recuperação
 const client = new Client({
     puppeteer: {
-        executablePath: chromePath,
         headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--remote-debugging-port=9222',
-            '--max-memory=512M',
-        ],
+            '--disable-gpu'
+        ]
     },
-    webVersionCache: {
-        type: 'none',
-    },
-    restartOnAuthFail: true,
+    qrMaxRetries: 5
 });
 
 const userStates = new Map();
@@ -77,7 +66,7 @@ async function withRetry(operation, maxAttempts = 3) {
 
 async function sendMedia(msg, mediaPath, options = {}) {
     return withRetry(async () => {
-        const absolutePath = path.join(__dirname, mediaPath);
+        const absolutePath = path.resolve(__dirname, mediaPath);
         if (!fs.existsSync(absolutePath)) {
             throw new Error(`Arquivo não encontrado: ${absolutePath}`);
         }
@@ -85,6 +74,7 @@ async function sendMedia(msg, mediaPath, options = {}) {
         return await client.sendMessage(msg.from, media, options);
     });
 }
+
 async function sendMultipleVideos(msg, videoPaths) {
     try {
         if (!videoPaths || !Array.isArray(videoPaths)) {
@@ -107,8 +97,10 @@ async function sendMultipleVideos(msg, videoPaths) {
     }
 }
 
-async function processNextStage(userId, msg, currentStage) {
+async function processNextStage(msg, currentStage) {
     try {
+        const userId = msg.from;
+
         if (finishedConversations.has(userId)) {
             log.info('Conversa já finalizada para o usuário:', userId);
             return;
@@ -228,7 +220,7 @@ async function processNextStage(userId, msg, currentStage) {
             case 'waiting_for_price_response':
                 markMessageAsSent(userId, currentStage);
                 userStates.set(userId, 'waiting_final_promise');
-                await processNextStage(userId, msg, 'waiting_final_promise');
+                await processNextStage(msg, 'waiting_final_promise');
                 break;
 
             case 'waiting_final_promise':
@@ -322,30 +314,6 @@ async function processNextStage(userId, msg, currentStage) {
     }
 }
 
-// Sistema de recuperação de estado
-let reconnectionAttempts = 0;
-const MAX_RECONNECTION_ATTEMPTS = 5;
-
-async function handleReconnection(reason) {
-    log.error('Desconexão detectada:', reason);
-    
-    if (reconnectionAttempts < MAX_RECONNECTION_ATTEMPTS) {
-        reconnectionAttempts++;
-        log.info(`Tentativa de reconexão ${reconnectionAttempts}/${MAX_RECONNECTION_ATTEMPTS}`);
-        
-        try {
-            await client.initialize();
-            reconnectionAttempts = 0;
-        } catch (error) {
-            log.error('Falha na reconexão:', error);
-            setTimeout(() => handleReconnection(reason), 5000 * reconnectionAttempts);
-        }
-    } else {
-        log.error('Máximo de tentativas de reconexão atingido. Reiniciando processo...');
-        process.exit(1);
-    }
-}
-
 client.on('qr', qr => {
     qrcode.generate(qr, { small: true });
     log.info('Novo QR Code gerado');
@@ -353,33 +321,15 @@ client.on('qr', qr => {
 
 client.on('ready', () => {
     log.info('WhatsApp conectado com sucesso');
-    reconnectionAttempts = 0;
 });
 
-client.on('auth_failure', msg => {
-    log.error('Falha na autenticação:', msg);
-    handleReconnection('auth_failure');
-});
-
-client.on('disconnected', reason => {
-    handleReconnection(reason);
-});
-
-process.on('uncaughtException', error => {
-    log.error('Erro não capturado:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    log.error('Promessa rejeitada não tratada:', reason);
-});
-
-client.on('message', async (msg) => {
+client.on('message', async msg => {
     try {
-        const userId = msg.from;
-
         if (!msg.from.endsWith('@c.us')) {
             return;
         }
+
+        const userId = msg.from;
 
         if (finishedConversations.has(userId)) {
             return;
@@ -387,10 +337,10 @@ client.on('message', async (msg) => {
 
         if (!userStates.has(userId)) {
             userStates.set(userId, 'initial');
-            await processNextStage(userId, msg, 'initial');
+            await processNextStage(msg, 'initial');
         } else {
             const currentState = userStates.get(userId);
-            await processNextStage(userId, msg, currentState);
+            await processNextStage(msg, currentState);
         }
     } catch (error) {
         log.error('Erro no processamento de mensagem:', error);
