@@ -2,6 +2,8 @@ const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const puppeteer = require('puppeteer');
 
 // Sistema de logs melhorado
 const log = {
@@ -17,8 +19,8 @@ const log = {
     }
 };
 
-// Caminho para o Chrome
-const chromePath = '/usr/bin/google-chrome';
+// Caminho do Chrome (detectado automaticamente)
+const chromePath = puppeteer.executablePath();
 
 // Configuração do cliente com sistema de recuperação
 const client = new Client({
@@ -75,7 +77,7 @@ async function withRetry(operation, maxAttempts = 3) {
 
 async function sendMedia(msg, mediaPath, options = {}) {
     return withRetry(async () => {
-        const absolutePath = path.resolve(__dirname, mediaPath);
+        const absolutePath = path.join(__dirname, mediaPath);
         if (!fs.existsSync(absolutePath)) {
             throw new Error(`Arquivo não encontrado: ${absolutePath}`);
         }
@@ -83,7 +85,6 @@ async function sendMedia(msg, mediaPath, options = {}) {
         return await client.sendMessage(msg.from, media, options);
     });
 }
-
 async function sendMultipleVideos(msg, videoPaths) {
     try {
         if (!videoPaths || !Array.isArray(videoPaths)) {
