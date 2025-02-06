@@ -1,7 +1,7 @@
 {
     "name": "chatbotmilion",
     "version": "1.0.0",
-    "main": "robo.js",
+    "main": "index.js",
     "dependencies": {
     "moment-timezone": "^0.5.45",
     "qrcode-terminal": "^0.12.0",
