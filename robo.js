@@ -459,12 +459,26 @@ class WhatsAppBot {
             await this.client.sendMessage(msg.from, 'Vou te enviar aqui em baixo novamente caso não tenha encontrado, tá?');
             this.logger.info('Mensagem 2 enviada.');
     
-            // Terceira mensagem (link)
-            await delay(config.delays.digitacao);
-            await chat.sendStateTyping();
-            await delay(config.delays.digitacao);
-            await this.client.sendMessage(msg.from, '🥰👇🏼\n https://bit.ly/liivinha');
-            this.logger.info('Link enviado.');
+// Terceira mensagem (link com botão)
+await delay(config.delays.digitacao);
+await chat.sendStateTyping();
+await delay(config.delays.digitacao);
+
+// Criando a mensagem interativa com botão
+const buttonMessage = {
+    text: '🥰👇🏼\n https://bit.ly/liivinha', // Texto da mensagem
+    buttons: [
+        {
+            buttonId: 'acessar_link', // ID do botão (pode ser usado para identificar a ação)
+            buttonText: { displayText: 'ACESSE AQUI' }, // Texto exibido no botão
+            type: 1 // Tipo de botão (1 = Botão de resposta rápida)
+        }
+    ]
+};
+
+// Enviando a mensagem interativa
+await this.client.sendMessage(msg.from, buttonMessage);
+this.logger.info('Link e botão enviados.');
     
             // Quarta mensagem
             await delay(config.delays.digitacao);
