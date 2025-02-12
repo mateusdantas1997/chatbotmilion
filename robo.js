@@ -18,13 +18,12 @@ const config = {
     }
 };
 
-// Logger System (sem arquivos)
+// Logger System
 class Logger {
     info(mensagem) {
         const timestamp = new Date().toISOString();
         console.log(`[INFO][${timestamp}] ${mensagem}`);
     }
-
     error(mensagem, erro = '') {
         const timestamp = new Date().toISOString();
         console.error(`[ERROR][${timestamp}] ${mensagem} ${erro}`);
@@ -33,7 +32,8 @@ class Logger {
 
 // State Manager
 class GerenciadorEstado {
-    constructor() {
+    constructor(logger) {
+        this.logger = logger;
         this.estadosUsuario = new Map();
         this.mensagensEnviadas = new Map();
         this.conversasFinalizadas = new Set();
@@ -44,17 +44,21 @@ class GerenciadorEstado {
     }
 
     definirEstadoUsuario(idUsuario, estado) {
-        this.logger?.info(`Definindo estado do usuário ${idUsuario}: ${estado}`);
+        this.logger.info(`Definindo estado do usuário ${idUsuario}: ${estado}`);
         this.estadosUsuario.set(idUsuario, estado);
     }
 
     mensagemJaEnviada(idUsuario, estagio) {
-        return this.mensagensEnviadas.get(`${idUsuario}-${estagio}`);
+        const chave = `${idUsuario}-${estagio}`;
+        const resultado = this.mensagensEnviadas.get(chave);
+        this.logger.info(`Verificando se mensagem já foi enviada para ${chave}: ${resultado}`);
+        return resultado;
     }
 
     marcarMensagemEnviada(idUsuario, estagio) {
-        this.logger?.info(`Marcando mensagem enviada para o estágio ${estagio} do usuário ${idUsuario}`);
-        this.mensagensEnviadas.set(`${idUsuario}-${estagio}`, true);
+        const chave = `${idUsuario}-${estagio}`;
+        this.logger.info(`Marcando mensagem enviada para o estágio ${chave}`);
+        this.mensagensEnviadas.set(chave, true);
     }
 
     conversaFinalizada(idUsuario) {
@@ -62,23 +66,24 @@ class GerenciadorEstado {
     }
 
     finalizarConversa(idUsuario) {
-        this.logger?.info(`Finalizando conversa do usuário ${idUsuario}`);
+        this.logger.info(`Finalizando conversa do usuário ${idUsuario}`);
         this.conversasFinalizadas.add(idUsuario);
     }
 
     limparEstadoUsuario(idUsuario) {
-        this.logger?.info(`Limpando estado do usuário ${idUsuario}`);
+        this.logger.info(`Limpando estado do usuário ${idUsuario}`);
         this.estadosUsuario.delete(idUsuario);
         this.mensagensEnviadas.delete(idUsuario);
         this.conversasFinalizadas.delete(idUsuario);
     }
 }
 
-// Media Manager (sem diretórios)
+// Media Manager
 class GerenciadorMidia {
     constructor(logger) {
         this.logger = logger;
     }
+
     async enviarMidia(client, msg, caminhoMidia, opcoes = {}) {
         try {
             if (!fs.existsSync(caminhoMidia)) {
@@ -92,9 +97,19 @@ class GerenciadorMidia {
             throw erro;
         }
     }
+
     async enviarMultiplosVideos(client, msg, caminhoVideos, delayEntre = config.delays.entreVideos) {
         for (const caminhoVideo of caminhoVideos) {
             try {
+                const idUsuario = msg.from;
+                const chaveMidia = `${idUsuario}-${caminhoVideo}`;
+
+                // Verificar se o vídeo já foi enviado
+                if (this.mensagensEnviadas.get(chaveMidia)) {
+                    this.logger.info(`Vídeo já enviado: ${caminhoVideo}`);
+                    continue;
+                }
+
                 // Definir visualização única para os vídeos específicos
                 const opcoes = {};
                 if (caminhoVideo === './video1.mp4' || caminhoVideo === './video3.mp4') {
@@ -103,6 +118,9 @@ class GerenciadorMidia {
 
                 await this.enviarMidia(client, msg, caminhoVideo, opcoes);
                 this.logger.info(`Vídeo enviado: ${caminhoVideo}`);
+
+                // Marcar vídeo como enviado
+                this.mensagensEnviadas.set(chaveMidia, true);
 
                 if (caminhoVideos.indexOf(caminhoVideo) < caminhoVideos.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, delayEntre));
@@ -118,7 +136,7 @@ class GerenciadorMidia {
 class WhatsAppBot {
     constructor() {
         this.logger = new Logger();
-        this.gerenciadorEstado = new GerenciadorEstado();
+        this.gerenciadorEstado = new GerenciadorEstado(this.logger);
         this.gerenciadorMidia = new GerenciadorMidia(this.logger);
         this.chromePath = this.obterCaminhoChromeDriver();
         this.inicializarBot();
@@ -223,10 +241,23 @@ class WhatsAppBot {
     async handleMessage(msg) {
         try {
             if (!msg.from.endsWith('@c.us')) return;
+
             const idUsuario = msg.from;
+            const messageId = msg.id.id; // ID único da mensagem
+
+            // Ignorar mensagens duplicadas
+            if (this.gerenciadorEstado.mensagemJaEnviada(idUsuario, messageId)) {
+                this.logger.info(`Mensagem duplicada ignorada: ${messageId}`);
+                return;
+            }
+
+            // Marcar mensagem como processada
+            this.gerenciadorEstado.marcarMensagemEnviada(idUsuario, messageId);
+
             if (this.gerenciadorEstado.conversaFinalizada(idUsuario)) {
                 return;
             }
+
             if (!this.gerenciadorEstado.obterEstadoUsuario(idUsuario)) {
                 this.gerenciadorEstado.definirEstadoUsuario(idUsuario, 'initial');
                 await this.processarProximoEstagio(idUsuario, msg, 'initial');
@@ -245,6 +276,7 @@ class WhatsAppBot {
                 this.logger.info(`Mensagem já enviada para estágio ${estagioAtual}`);
                 return;
             }
+
             const chat = await msg.getChat();
             await this.processarEstagio(idUsuario, msg, chat, estagioAtual);
         } catch (erro) {
@@ -444,35 +476,30 @@ class WhatsAppBot {
         const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         try {
             this.gerenciadorEstado.marcarMensagemEnviada(idUsuario, 'waiting_after_audio6');
-    
             // Primeira mensagem
             await delay(config.delays.digitacao);
             await chat.sendStateTyping();
             await delay(config.delays.digitacao);
             await this.client.sendMessage(msg.from, 'Amorzinho, eu só posso continuar nossa conversa se você assinar meu conteúdo clicando no link que te enviei');
             this.logger.info('Mensagem 1 enviada.');
-    
             // Segunda mensagem
             await delay(config.delays.digitacao);
             await chat.sendStateTyping();
             await delay(config.delays.digitacao);
             await this.client.sendMessage(msg.from, 'Vou te enviar aqui em baixo novamente caso não tenha encontrado, tá?');
             this.logger.info('Mensagem 2 enviada.');
-    
             // Terceira mensagem (link)
             await delay(config.delays.digitacao);
             await chat.sendStateTyping();
             await delay(config.delays.digitacao);
             await this.client.sendMessage(msg.from, '🥰👇🏼\n http://bit.ly/livinhavlt');
             this.logger.info('Link enviado.');
-    
             // Quarta mensagem
             await delay(config.delays.digitacao);
             await chat.sendStateTyping();
             await delay(config.delays.digitacao);
             await this.client.sendMessage(msg.from, 'Compre vai meu bb, deixa eu te fazer gozar mostrando minha bucetinha toda molhada🤤😈');
             this.logger.info('Mensagem 4 enviada.');
-    
             // Finalizar conversa
             this.gerenciadorEstado.finalizarConversa(idUsuario);
             this.gerenciadorEstado.limparEstadoUsuario(idUsuario);
