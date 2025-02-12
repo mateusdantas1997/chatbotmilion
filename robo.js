@@ -414,11 +414,11 @@ class WhatsAppBot {
         await delay(config.delays.digitacao);
         await chat.sendStateTyping();
         await delay(config.delays.digitacao);
-        await this.client.sendMessage(msg.from, 'Ameeei, vou te enviar o link pra a gente gozar bem gostoso juntinhos');
+        await this.client.sendMessage(msg.from, 'Vou te enviar o link pra a gente gozar bem gostoso juntinhos');
         await delay(config.delays.digitacao);
         await chat.sendStateTyping();
         await delay(config.delays.digitacao);
-        await this.client.sendMessage(msg.from, 'Clique aqui para pagar e ver minha bucetinha toda molhada💦😏\n 👉 https://bit.ly/liivinha 👈');
+        await this.client.sendMessage(msg.from, 'Clique aqui para pagar e ver minha bucetinha toda molhada💦😏\n 👉 http://bit.ly/livinhavlt 👈');
         await delay(config.delays.digitacao);
         await chat.sendStateTyping();
         await delay(config.delays.digitacao);
@@ -463,7 +463,7 @@ class WhatsAppBot {
             await delay(config.delays.digitacao);
             await chat.sendStateTyping();
             await delay(config.delays.digitacao);
-            await this.client.sendMessage(msg.from, '🥰👇🏼\n https://bit.ly/liivinha');
+            await this.client.sendMessage(msg.from, '🥰👇🏼\n http://bit.ly/livinhavlt');
             this.logger.info('Link enviado.');
     
             // Quarta mensagem
