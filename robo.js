@@ -400,11 +400,7 @@ class WhatsAppBot {
         await delay(config.delays.digitacao);
         await chat.sendStateTyping();
         await delay(config.delays.digitacao);
-        await this.client.sendMessage(msg.from, 'Mas antes de eu te enviar meu link com a promoção, me promete que depois você vai marcar comigo?🥹');
-        await delay(config.delays.digitacao);
-        await chat.sendStateTyping();
-        await delay(config.delays.digitacao);
-        await this.client.sendMessage(msg.from, 'Me promete que vamos marcar pra você me comer gostoso?😏');
+        await this.client.sendMessage(msg.from, 'Me promete que vai comprar mesmo amor?😏');
         this.gerenciadorEstado.definirEstadoUsuario(idUsuario, 'sending_link');
     }
 
